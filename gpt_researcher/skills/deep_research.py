@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional, Set
 import asyncio
 import logging
 import time
+import re
 from datetime import datetime, timedelta
 
 from gpt_researcher.llm_provider.generic.base import ReasoningEfforts
@@ -76,23 +77,47 @@ class DeepResearchSkill:
             temperature=0.4
         )
 
-        lines = response.split('\n')
+        # Robust parsing using regex to handle various LLM output formats
+        # Handles: "Query:", "**Query:**", "Query 1:", "- Query:", etc.
         queries = []
         current_query = {}
 
+        # Define robust regex patterns
+        query_pattern = re.compile(r'(?:\*\*)?(?:[-\*\d\.]+\s*)?query\s*(?:\d+)?\s*[:：]\s*(.+)', re.IGNORECASE)
+        goal_pattern = re.compile(r'(?:\*\*)?(?:[-\*\d\.]+\s*)?(?:research\s+)?goal\s*(?:\d+)?\s*[:：]\s*(.+)', re.IGNORECASE)
+
+        lines = response.split('\n')
         for line in lines:
             line = line.strip()
-            if line.startswith('Query:'):
+
+            # Try to match query pattern
+            query_match = query_pattern.match(line)
+            if query_match:
+                # Save previous query if exists
                 if current_query:
                     queries.append(current_query)
-                current_query = {'query': line.replace('Query:', '').strip()}
-            elif line.startswith('Goal:') and current_query:
-                current_query['researchGoal'] = line.replace('Goal:', '').strip()
+                # Start new query
+                current_query = {'query': query_match.group(1).strip().rstrip('*').strip()}
+                continue
 
+            # Try to match goal pattern
+            goal_match = goal_pattern.match(line)
+            if goal_match and current_query:
+                current_query['researchGoal'] = goal_match.group(1).strip().rstrip('*').strip()
+                continue
+
+        # Don't forget the last query
         if current_query:
             queries.append(current_query)
 
-        return queries[:num_queries]
+        # Validate: ensure we have at least some queries with both query and goal
+        valid_queries = [q for q in queries if 'query' in q and q['query'] and 'researchGoal' in q]
+
+        # Log warning if parsing failed
+        if not valid_queries and response:
+            logger.warning(f"Query generation parsing failed. Expected {num_queries} queries, got 0. LLM response:\n{response}")
+
+        return valid_queries[:num_queries]
 
     async def generate_research_plan(self, query: str, num_questions: int = 3) -> List[str]:
         """Generate follow-up questions to clarify research direction"""
