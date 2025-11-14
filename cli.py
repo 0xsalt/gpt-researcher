@@ -291,5 +291,11 @@ async def main(args):
 
 if __name__ == "__main__":
     load_dotenv()
+
+    # Show help if no arguments provided
+    if len(sys.argv) == 1:
+        cli.print_help()
+        sys.exit(0)
+
     args = cli.parse_args()
     asyncio.run(main(args))
