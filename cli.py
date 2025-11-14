@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 
 from gpt_researcher import GPTResearcher
 from gpt_researcher.utils.enum import ReportType, ReportSource, Tone
+from gpt_researcher.utils.debug_logger import initialize_debug_logger, get_debug_logger
 from gpt_researcher.exceptions import TavilyAPIError
 from backend.report_type import DetailedReport
 from backend.utils import write_md_to_pdf, write_md_to_word
@@ -143,6 +144,16 @@ cli.add_argument(
     help="Fail immediately if Tavily search errors (default: continue with empty results)."
 )
 
+# =====================================
+# Arg: Debug
+# =====================================
+
+cli.add_argument(
+    "--debug",
+    action="store_true",
+    help="Enable debug logging to both stdout (with emoji messages) and log file."
+)
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -155,6 +166,14 @@ async def main(args):
     # Set strict Tavily mode if requested
     if getattr(args, "strict_tavily", False):
         os.environ["STRICT_TAVILY"] = "true"
+
+    # Initialize debug logger
+    debug_logger = initialize_debug_logger(enabled=args.debug)
+
+    if args.debug:
+        debug_logger.info("🚀", f"Starting research: {args.query}")
+        debug_logger.info("📋", f"Report type: {args.report_type}")
+        debug_logger.info("🎨", f"Tone: {args.tone}")
 
     query_domains = args.query_domains.split(",") if args.query_domains else []
 
@@ -197,7 +216,14 @@ async def main(args):
                 encoding=args.encoding
             )
 
+            if args.debug:
+                debug_logger.info("🔍", "Starting research phase...")
+
             await researcher.conduct_research()
+
+            if args.debug:
+                debug_logger.info("✅", "Research phase completed")
+                debug_logger.info("✍️", "Writing report...")
 
             report = await researcher.write_report()
     except TavilyAPIError as e:
@@ -224,6 +250,11 @@ async def main(args):
     os.makedirs("outputs", exist_ok=True)
     with open(artifact_filepath, "w", encoding="utf-8") as f:
         f.write(report)
+
+    if args.debug:
+        debug_logger.info("💾", f"Report written to '{artifact_filepath}'")
+        debug_logger.close()
+
     print(f"Report written to '{artifact_filepath}'")
 
     # Generate PDF if not disabled

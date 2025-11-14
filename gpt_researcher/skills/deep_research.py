@@ -8,6 +8,7 @@ from gpt_researcher.llm_provider.generic.base import ReasoningEfforts
 from ..utils.llm import create_chat_completion
 from ..utils.enum import ReportType, ReportSource, Tone
 from ..actions.query_processing import get_search_results
+from ..utils.debug_logger import get_debug_logger
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,9 @@ class DeepResearchSkill:
 
     async def generate_search_queries(self, query: str, num_queries: int = 3) -> List[Dict[str, str]]:
         """Generate SERP queries for research"""
+        debug_logger = get_debug_logger()
+        debug_logger.debug("🔎", f"Generating {num_queries} search queries...")
+
         messages = [
             {"role": "system", "content": "You are an expert researcher generating search queries."},
             {"role": "user",
@@ -91,6 +95,8 @@ class DeepResearchSkill:
 
         if current_query:
             queries.append(current_query)
+
+        debug_logger.debug("✅", f"Generated {len(queries[:num_queries])} queries: {[q['query'] for q in queries[:num_queries]]}")
 
         return queries[:num_queries]
 
@@ -206,6 +212,9 @@ Format each question on a new line starting with 'Question: '"""}
         if visited_urls is None:
             visited_urls = set()
 
+        debug_logger = get_debug_logger()
+        debug_logger.info("🔍", f"DEEP RESEARCH: Starting with breadth={breadth}, depth={depth}, concurrency={self.concurrency_limit}")
+
         progress = ResearchProgress(depth, breadth)
 
         if on_progress:
@@ -214,6 +223,8 @@ Format each question on a new line starting with 'Question: '"""}
         # Generate search queries
         serp_queries = await self.generate_search_queries(query, num_queries=breadth)
         progress.total_queries = len(serp_queries)
+
+        debug_logger.debug("📊", f"DEEP RESEARCH: depth={depth}, breadth={breadth}, query={query}")
 
         all_learnings = learnings.copy()
         all_citations = citations.copy()
@@ -227,6 +238,7 @@ Format each question on a new line starting with 'Question: '"""}
         async def process_query(serp_query: Dict[str, str]) -> Optional[Dict[str, Any]]:
             async with semaphore:
                 try:
+                    debug_logger.debug("🔎", f"Processing query: {serp_query['query']}")
                     progress.current_query = serp_query['query']
                     if on_progress:
                         on_progress(progress)
@@ -265,6 +277,8 @@ Format each question on a new line starting with 'Question: '"""}
                     if on_progress:
                         on_progress(progress)
 
+                    debug_logger.debug("✅", f"Completed query: {serp_query['query']}")
+
                     return {
                         'learnings': results['learnings'],
                         'visited_urls': list(visited),
@@ -277,6 +291,7 @@ Format each question on a new line starting with 'Question: '"""}
 
                 except Exception as e:
                     logger.error(f"Error processing query '{serp_query['query']}': {str(e)}")
+                    debug_logger.error("❌", f"Error processing query '{serp_query['query']}': {str(e)}")
                     return None
 
         # Process queries concurrently with limit
