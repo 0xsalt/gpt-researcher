@@ -22,16 +22,24 @@ async def get_search_results(query: str, retriever: Any, query_domains: List[str
     Returns:
         A list of search results
     """
+    # Get strict_tavily setting from researcher config if available
+    strict_mode = False
+    if researcher and hasattr(researcher, 'cfg'):
+        strict_mode = getattr(researcher.cfg, 'strict_tavily', False)
+
     # Check if this is an MCP retriever and pass the researcher instance
     if "mcpretriever" in retriever.__name__.lower():
         search_retriever = retriever(
-            query, 
+            query,
             query_domains=query_domains,
             researcher=researcher  # Pass researcher instance for MCP retrievers
         )
+    elif "tavilysearch" in retriever.__name__.lower():
+        # Pass strict_mode to TavilySearch
+        search_retriever = retriever(query, query_domains=query_domains, strict_mode=strict_mode)
     else:
         search_retriever = retriever(query, query_domains=query_domains)
-    
+
     return search_retriever.search()
 
 async def generate_sub_queries(

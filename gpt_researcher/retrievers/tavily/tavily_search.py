@@ -6,13 +6,15 @@ from typing import Literal, Sequence, Optional
 import requests
 import json
 
+from ...exceptions import TavilyAPIError
+
 
 class TavilySearch:
     """
     Tavily API Retriever
     """
 
-    def __init__(self, query, headers=None, topic="general", query_domains=None):
+    def __init__(self, query, headers=None, topic="general", query_domains=None, strict_mode=False):
         """
         Initializes the TavilySearch object.
 
@@ -21,6 +23,7 @@ class TavilySearch:
             headers (dict, optional): Additional headers to include in the request. Defaults to None.
             topic (str, optional): The topic for the search. Defaults to "general".
             query_domains (list, optional): List of domains to include in the search. Defaults to None.
+            strict_mode (bool, optional): If True, raise TavilyAPIError on API failures instead of returning empty results. Defaults to False.
         """
         self.query = query
         self.headers = headers or {}
@@ -31,6 +34,7 @@ class TavilySearch:
             "Content-Type": "application/json",
         }
         self.query_domains = query_domains or None
+        self.strict_mode = strict_mode
 
     def get_api_key(self):
         """
@@ -90,8 +94,20 @@ class TavilySearch:
         if response.status_code == 200:
             return response.json()
         else:
-            # Raises a HTTPError if the HTTP request returned an unsuccessful status code
-            response.raise_for_status()
+            # In strict mode, raise TavilyAPIError with diagnostic information
+            if self.strict_mode:
+                query_length = len(query)
+                error_msg = f"Tavily API returned status {response.status_code}: {response.text}"
+
+                # Add helpful diagnostic for common 400 error (query too long)
+                if response.status_code == 400 and query_length > 400:
+                    error_msg += f"\n\nQuery length: {query_length} characters (Tavily limit is ~400-500 characters)"
+                    error_msg += f"\nTip: Shorten your --task query or let deep research mode handle the details"
+
+                raise TavilyAPIError(error_msg, status_code=response.status_code, query_length=query_length)
+            else:
+                # Default behavior: raise HTTPError (will be caught by search() method)
+                response.raise_for_status()
 
     def search(self, max_results=10):
         """
@@ -115,7 +131,12 @@ class TavilySearch:
             search_response = [
                 {"href": obj["url"], "body": obj["content"]} for obj in sources
             ]
+        except TavilyAPIError:
+            # In strict mode, let TavilyAPIError propagate to caller
+            # This allows the CLI to catch it and display a helpful error message
+            raise
         except Exception as e:
+            # Default behavior: log error and return empty results (backward compatible)
             print(f"Error: {e}. Failed fetching sources. Resulting in empty response.")
             search_response = []
         return search_response

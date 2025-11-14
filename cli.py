@@ -18,8 +18,10 @@ from dotenv import load_dotenv
 
 from gpt_researcher import GPTResearcher
 from gpt_researcher.utils.enum import ReportType, ReportSource, Tone
+from gpt_researcher.exceptions import TavilyAPIError
 from backend.report_type import DetailedReport
 from backend.utils import write_md_to_pdf, write_md_to_word
+import sys
 
 # =============================================================================
 # CLI
@@ -131,6 +133,16 @@ cli.add_argument(
     help="Skip DOCX generation (generate markdown and PDF only)."
 )
 
+# =====================================
+# Arg: Strict Tavily Mode
+# =====================================
+
+cli.add_argument(
+    "--strict-tavily",
+    action="store_true",
+    help="Fail immediately if Tavily search errors (default: continue with empty results)."
+)
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -140,49 +152,71 @@ async def main(args):
     Conduct research on the given query, generate the report, and write
     it as a markdown file to the output directory.
     """
+    # Set strict Tavily mode if requested
+    if getattr(args, "strict_tavily", False):
+        os.environ["STRICT_TAVILY"] = "true"
+
     query_domains = args.query_domains.split(",") if args.query_domains else []
 
-    if args.report_type == 'detailed_report':
-        detailed_report = DetailedReport(
-            query=args.query,
-            query_domains=query_domains,
-            report_type="research_report",
-            report_source="web_search",
-        )
+    try:
+        if args.report_type == 'detailed_report':
+            detailed_report = DetailedReport(
+                query=args.query,
+                query_domains=query_domains,
+                report_type="research_report",
+                report_source="web_search",
+            )
 
-        report = await detailed_report.run()
-    else:
-        # Convert the simple keyword to the full Tone enum value
-        tone_map = {
-            "objective": Tone.Objective,
-            "formal": Tone.Formal,
-            "analytical": Tone.Analytical,
-            "persuasive": Tone.Persuasive,
-            "informative": Tone.Informative,
-            "explanatory": Tone.Explanatory,
-            "descriptive": Tone.Descriptive,
-            "critical": Tone.Critical,
-            "comparative": Tone.Comparative,
-            "speculative": Tone.Speculative,
-            "reflective": Tone.Reflective,
-            "narrative": Tone.Narrative,
-            "humorous": Tone.Humorous,
-            "optimistic": Tone.Optimistic,
-            "pessimistic": Tone.Pessimistic
-        }
+            report = await detailed_report.run()
+        else:
+            # Convert the simple keyword to the full Tone enum value
+            tone_map = {
+                "objective": Tone.Objective,
+                "formal": Tone.Formal,
+                "analytical": Tone.Analytical,
+                "persuasive": Tone.Persuasive,
+                "informative": Tone.Informative,
+                "explanatory": Tone.Explanatory,
+                "descriptive": Tone.Descriptive,
+                "critical": Tone.Critical,
+                "comparative": Tone.Comparative,
+                "speculative": Tone.Speculative,
+                "reflective": Tone.Reflective,
+                "narrative": Tone.Narrative,
+                "humorous": Tone.Humorous,
+                "optimistic": Tone.Optimistic,
+                "pessimistic": Tone.Pessimistic
+            }
 
-        researcher = GPTResearcher(
-            query=args.query,
-            query_domains=query_domains,
-            report_type=args.report_type,
-            report_source=args.report_source,
-            tone=tone_map[args.tone],
-            encoding=args.encoding
-        )
+            researcher = GPTResearcher(
+                query=args.query,
+                query_domains=query_domains,
+                report_type=args.report_type,
+                report_source=args.report_source,
+                tone=tone_map[args.tone],
+                encoding=args.encoding
+            )
 
-        await researcher.conduct_research()
+            await researcher.conduct_research()
 
-        report = await researcher.write_report()
+            report = await researcher.write_report()
+    except TavilyAPIError as e:
+        # Tavily API error in strict mode - provide helpful error message and exit
+        sys.stderr.write("\n" + "="*70 + "\n")
+        sys.stderr.write("❌ TAVILY API ERROR\n")
+        sys.stderr.write("="*70 + "\n\n")
+        sys.stderr.write(f"Status Code: {e.status_code}\n")
+        if e.query_length:
+            sys.stderr.write(f"Query Length: {e.query_length} characters\n")
+            if e.query_length > 400:
+                sys.stderr.write(f"\n💡 TIP: Tavily has a ~400-500 character query limit.\n")
+                sys.stderr.write(f"        Shorten your query and let deep research\n")
+                sys.stderr.write(f"        mode handle the comprehensive details.\n")
+        sys.stderr.write(f"\nError Details:\n{str(e)}\n\n")
+        sys.stderr.write("To continue research despite Tavily errors, run without\n")
+        sys.stderr.write("the --strict-tavily flag (research will use other sources).\n\n")
+        sys.stderr.write("="*70 + "\n")
+        sys.exit(3)  # Exit code 3 = Tavily API failure in strict mode
 
     # Write the report to markdown file
     task_id = str(uuid4())

@@ -43,4 +43,5 @@ DEFAULT_CONFIG: BaseConfig = {
     "MCP_ALLOWED_ROOT_PATHS": [],  # List of allowed root paths for local file access
     "MCP_STRATEGY": "fast",  # MCP execution strategy: "fast", "deep", "disabled"
     "REASONING_EFFORT": "medium",
+    "STRICT_TAVILY": False,  # Fail immediately on Tavily API errors (default: continue with empty results)
 }
