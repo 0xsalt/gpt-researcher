@@ -29,6 +29,8 @@ This fork includes production-tested improvements and fixes for GPT Researcher:
 
 **Firecrawl SDK Compatibility** ([PR #1552](https://github.com/assafelovic/gpt-researcher/pull/1552)) - Fixed compatibility with Firecrawl SDK v4.6.0+ by updating deprecated API calls and attribute access patterns. Resolves "AttributeError: 'Firecrawl' object has no attribute 'scrape_url'" errors.
 
+**Query Generation Parsing** - Fixed "every other run" research failures caused by fragile LLM output parsing. Implemented robust regex-based parsing to handle format variations (numbered queries, markdown formatting, bullets, etc.). Prevents silent research skipping with 0 queries generated.
+
 ### Features
 
 **Firecrawl Resilience** - Added automatic retry logic for Firecrawl rate limit errors with exponential backoff. Includes XML content type detection to eliminate parser warnings.
@@ -39,6 +41,10 @@ This fork includes production-tested improvements and fixes for GPT Researcher:
 
 **Strict Tavily Mode** ([PR #1553](https://github.com/assafelovic/gpt-researcher/pull/1553)) - Added `--strict-tavily` flag for explicit Tavily API error handling. When enabled, research fails immediately on Tavily errors with detailed diagnostics instead of continuing with partial results.
 
+**Debug Logging** - Added `--debug` CLI flag for comprehensive research process logging. Outputs emoji-enhanced messages to stdout for visual clarity and writes detailed timestamped logs to file (`outputs/diagnostic_*.log`) for deep analysis and troubleshooting.
+
+**Custom Report Naming** - Added `--report-name` CLI flag to specify custom output filenames. Automatically generates all output formats (markdown, PDF, DOCX) with the provided name instead of UUID-based filenames. Simplifies report organization and retrieval.
+
 ### Usage
 
 ```bash
@@ -47,6 +53,12 @@ python cli.py "your query" --report_type deep --no-pdf
 
 # Enable strict API error handling
 python cli.py "your query" --strict-tavily
+
+# Enable debug logging with custom report name
+python cli.py "your query" --report_type deep --debug --report-name "my-research"
+
+# Custom report naming (generates my-research.md, my-research.pdf, my-research.docx)
+python cli.py "your query" --report_type deep --report-name "market-analysis-2025"
 
 # Configure global rate limiting (in .env)
 SCRAPER_RATE_LIMIT_DELAY=6.5  # 10 requests/min for Firecrawl free tier
