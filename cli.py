@@ -21,7 +21,7 @@ from gpt_researcher.utils.enum import ReportType, ReportSource, Tone
 from gpt_researcher.utils.debug_logger import initialize_debug_logger, get_debug_logger
 from gpt_researcher.exceptions import TavilyAPIError
 from backend.report_type import DetailedReport
-from backend.utils import write_md_to_pdf, write_md_to_word
+from backend.utils import write_text_to_md, write_md_to_pdf, write_md_to_word
 import sys
 
 # =============================================================================
@@ -154,6 +154,18 @@ cli.add_argument(
     help="Enable debug logging to both stdout (with emoji messages) and log file."
 )
 
+# =====================================
+# Arg: Report Name
+# =====================================
+
+cli.add_argument(
+    "--report-name",
+    type=str,
+    help="Custom name for the output report files (without extension).\n"
+         "Example: --report-name \"my-research\" produces my-research.md, my-research.pdf, etc.",
+    default=None
+)
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -244,36 +256,38 @@ async def main(args):
         sys.stderr.write("="*70 + "\n")
         sys.exit(3)  # Exit code 3 = Tavily API failure in strict mode
 
-    # Write the report to markdown file
-    task_id = str(uuid4())
-    artifact_filepath = f"outputs/{task_id}.md"
+    # Determine report filename
     os.makedirs("outputs", exist_ok=True)
-    with open(artifact_filepath, "w", encoding="utf-8") as f:
-        f.write(report)
+    if args.report_name:
+        report_filename = args.report_name
+    else:
+        report_filename = str(uuid4())
 
-    if args.debug:
-        debug_logger.info("💾", f"Report written to '{artifact_filepath}'")
-        debug_logger.close()
-
-    print(f"Report written to '{artifact_filepath}'")
+    # Generate markdown (always)
+    md_path = await write_text_to_md(report, report_filename)
+    print(f"\nReport generation complete:")
+    print(f"  Markdown: outputs/{report_filename}.md")
 
     # Generate PDF if not disabled
     if not args.no_pdf:
         try:
-            pdf_path = await write_md_to_pdf(report, task_id)
+            pdf_path = await write_md_to_pdf(report, report_filename)
             if pdf_path:
-                print(f"PDF written to '{pdf_path}'")
+                print(f"  PDF:      outputs/{report_filename}.pdf")
         except Exception as e:
-            print(f"Warning: PDF generation failed: {e}")
+            print(f"  Warning: PDF generation failed: {e}")
 
     # Generate DOCX if not disabled
     if not args.no_docx:
         try:
-            docx_path = await write_md_to_word(report, task_id)
+            docx_path = await write_md_to_word(report, report_filename)
             if docx_path:
-                print(f"DOCX written to '{docx_path}'")
+                print(f"  DOCX:     outputs/{report_filename}.docx")
         except Exception as e:
-            print(f"Warning: DOCX generation failed: {e}")
+            print(f"  Warning: DOCX generation failed: {e}")
+
+    if args.debug:
+        debug_logger.close()
 
 if __name__ == "__main__":
     load_dotenv()
