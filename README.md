@@ -31,6 +31,8 @@ This fork includes production-tested improvements and fixes for GPT Researcher:
 
 **Query Generation Parsing** - Fixed "every other run" research failures caused by fragile LLM output parsing. Implemented robust regex-based parsing to handle format variations (numbered queries, markdown formatting, bullets, etc.). Prevents silent research skipping with 0 queries generated.
 
+**PDF Generation CSS Path** - Fixed PDF generation failure caused by incorrect CSS file path. Corrected path from `./styles/pdf_styles.css` to `backend/styles/pdf_styles.css` to match actual file location. Resolves "[Errno 2] No such file or directory: './styles/pdf_styles.css'" error when using `write_md_to_pdf()`.
+
 ### Features
 
 **Firecrawl Resilience** - Added automatic retry logic for Firecrawl rate limit errors with exponential backoff. Includes XML content type detection to eliminate parser warnings.
@@ -41,9 +43,9 @@ This fork includes production-tested improvements and fixes for GPT Researcher:
 
 **Strict Tavily Mode** ([PR #1553](https://github.com/assafelovic/gpt-researcher/pull/1553)) - Added `--strict-tavily` flag for explicit Tavily API error handling. When enabled, research fails immediately on Tavily errors with detailed diagnostics instead of continuing with partial results.
 
-**Debug Logging** - Added `--debug` CLI flag for comprehensive research process logging. Outputs emoji-enhanced messages to stdout for visual clarity and writes detailed timestamped logs to file (`outputs/diagnostic_*.log`) for deep analysis and troubleshooting.
+**Debug Logging** - Added `--debug` CLI flag for comprehensive research process logging. Outputs emoji-enhanced messages to stdout for visual clarity and writes detailed timestamped logs to file for deep analysis and troubleshooting. Debug logs automatically use the report name with timestamp suffix (`{report-name}_{timestamp}.log`) for easy correlation between reports and their debug logs.
 
-**Custom Report Naming** - Added `--report-name` CLI flag to specify custom output filenames. Automatically generates all output formats (markdown, PDF, DOCX) with the provided name instead of UUID-based filenames. Simplifies report organization and retrieval.
+**Custom Report Naming** - Added `--report-name` CLI flag to specify custom output filenames. Automatically generates all output formats (markdown, PDF, DOCX) with the provided name instead of UUID-based filenames. Debug logs also use the same name for easy correlation. Simplifies report organization and retrieval.
 
 ### Usage
 
@@ -55,10 +57,15 @@ python cli.py "your query" --report_type deep --no-pdf
 python cli.py "your query" --strict-tavily
 
 # Enable debug logging with custom report name
+# Generates: my-research.md, my-research.pdf, my-research.docx
+#            my-research_2025-11-14.150139.439.log (debug log)
 python cli.py "your query" --report_type deep --debug --report-name "my-research"
 
 # Custom report naming (generates my-research.md, my-research.pdf, my-research.docx)
 python cli.py "your query" --report_type deep --report-name "market-analysis-2025"
+
+# Show help menu when run without arguments
+python cli.py  # displays usage help
 
 # Configure global rate limiting (in .env)
 SCRAPER_RATE_LIMIT_DELAY=6.5  # 10 requests/min for Firecrawl free tier
