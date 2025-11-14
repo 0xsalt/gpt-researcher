@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 from gpt_researcher import GPTResearcher
 from gpt_researcher.utils.enum import ReportType, Tone
 from backend.report_type import DetailedReport
+from backend.utils import write_text_to_md, write_md_to_pdf, write_md_to_word
 
 # =============================================================================
 # CLI
@@ -101,6 +102,18 @@ cli.add_argument(
     default=""
 )
 
+# =====================================
+# Arg: Report Name
+# =====================================
+
+cli.add_argument(
+    "--report-name",
+    type=str,
+    help="Custom name for the output report files (without extension).\n"
+         "Example: --report-name \"my-research\" produces my-research.md, my-research.pdf, etc.",
+    default=None
+)
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -153,13 +166,25 @@ async def main(args):
 
         report = await researcher.write_report()
 
-    # Write the report to a file
-    artifact_filepath = f"outputs/{uuid4()}.md"
+    # Determine report filename
     os.makedirs("outputs", exist_ok=True)
-    with open(artifact_filepath, "w", encoding="utf-8") as f:
-        f.write(report)
+    if args.report_name:
+        report_filename = args.report_name
+    else:
+        report_filename = str(uuid4())
 
-    print(f"Report written to '{artifact_filepath}'")
+    # Generate all output formats
+    md_path = await write_text_to_md(report, report_filename)
+    pdf_path = await write_md_to_pdf(report, report_filename)
+    docx_path = await write_md_to_word(report, report_filename)
+
+    # Print generated files
+    print(f"\nReport generation complete:")
+    print(f"  Markdown: outputs/{report_filename}.md")
+    if pdf_path:
+        print(f"  PDF:      outputs/{report_filename}.pdf")
+    if docx_path:
+        print(f"  DOCX:     outputs/{report_filename}.docx")
 
 if __name__ == "__main__":
     load_dotenv()
