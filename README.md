@@ -19,6 +19,43 @@
 
 </div>
 
+---
+
+## Fork Enhancements
+
+This fork includes production-tested improvements and fixes for GPT Researcher:
+
+### Bugfixes
+
+**Firecrawl SDK Compatibility** ([PR #1552](https://github.com/assafelovic/gpt-researcher/pull/1552)) - Fixed compatibility with Firecrawl SDK v4.6.0+ by updating deprecated API calls and attribute access patterns. Resolves "AttributeError: 'Firecrawl' object has no attribute 'scrape_url'" errors.
+
+### Features
+
+**Firecrawl Resilience** - Added automatic retry logic for Firecrawl rate limit errors with exponential backoff. Includes XML content type detection to eliminate parser warnings.
+
+**Global Scraper Rate Limiting** ([PR #1550](https://github.com/assafelovic/gpt-researcher/pull/1550)) - Implemented singleton rate limiter to enforce rate limits across concurrent async workers in deep research mode. Fixes issue where multiple WorkerPools violated API rate limits (e.g., Firecrawl's 10 req/min). Configurable via `SCRAPER_RATE_LIMIT_DELAY` environment variable.
+
+**CLI Output Control** ([PR #1553](https://github.com/assafelovic/gpt-researcher/pull/1553)) - Added selective report generation flags (`--no-pdf`, `--no-docx`) to skip unwanted output formats. Useful for fast iteration or when only markdown output is needed.
+
+**Strict Tavily Mode** ([PR #1553](https://github.com/assafelovic/gpt-researcher/pull/1553)) - Added `--strict-tavily` flag for explicit Tavily API error handling. When enabled, research fails immediately on Tavily errors with detailed diagnostics instead of continuing with partial results.
+
+### Usage
+
+```bash
+# Use output format control
+python cli.py "your query" --report_type deep --no-pdf
+
+# Enable strict API error handling
+python cli.py "your query" --strict-tavily
+
+# Configure global rate limiting (in .env)
+SCRAPER_RATE_LIMIT_DELAY=6.5  # 10 requests/min for Firecrawl free tier
+```
+
+**Pull Requests**: Bugfix and features submitted to upstream. Rate limiting implementation improved based on deep research testing.
+
+---
+
 # 🔎 GPT Researcher
 
 **GPT Researcher is an open deep research agent designed for both web and local research on any given task.** 
