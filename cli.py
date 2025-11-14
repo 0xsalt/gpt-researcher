@@ -179,8 +179,14 @@ async def main(args):
     if getattr(args, "strict_tavily", False):
         os.environ["STRICT_TAVILY"] = "true"
 
-    # Initialize debug logger
-    debug_logger = initialize_debug_logger(enabled=args.debug)
+    # Determine report filename early for debug logger naming
+    if args.report_name:
+        report_filename = args.report_name
+    else:
+        report_filename = str(uuid4())
+
+    # Initialize debug logger with report name
+    debug_logger = initialize_debug_logger(enabled=args.debug, report_name=report_filename)
 
     if args.debug:
         debug_logger.info("🚀", f"Starting research: {args.query}")
@@ -256,12 +262,8 @@ async def main(args):
         sys.stderr.write("="*70 + "\n")
         sys.exit(3)  # Exit code 3 = Tavily API failure in strict mode
 
-    # Determine report filename
+    # Ensure outputs directory exists
     os.makedirs("outputs", exist_ok=True)
-    if args.report_name:
-        report_filename = args.report_name
-    else:
-        report_filename = str(uuid4())
 
     # Generate markdown (always)
     md_path = await write_text_to_md(report, report_filename)

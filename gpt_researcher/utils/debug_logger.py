@@ -14,13 +14,14 @@ from typing import Optional
 class DebugLogger:
     """Debug logger with dual output (stdout emoji + file logging)."""
 
-    def __init__(self, enabled: bool = False, log_file: Optional[str] = None):
+    def __init__(self, enabled: bool = False, log_file: Optional[str] = None, report_name: Optional[str] = None):
         """
         Initialize debug logger.
 
         Args:
             enabled: Whether debug logging is enabled
             log_file: Path to log file (auto-generated if None and enabled)
+            report_name: Optional report name to use in auto-generated filename
         """
         self.enabled = enabled
         self.log_file = None
@@ -30,7 +31,10 @@ class DebugLogger:
             if log_file is None:
                 # Auto-generate log filename with timestamp
                 timestamp = datetime.now().strftime("%Y-%m-%d.%H%M.%S.%f")[:-3]  # milliseconds
-                self.log_file = f"outputs/diagnostic_{timestamp}.log"
+                if report_name:
+                    self.log_file = f"outputs/{report_name}_{timestamp}.log"
+                else:
+                    self.log_file = f"outputs/diagnostic_{timestamp}.log"
             else:
                 self.log_file = log_file
 
@@ -115,13 +119,14 @@ Started: {datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]}
 _debug_logger: Optional[DebugLogger] = None
 
 
-def initialize_debug_logger(enabled: bool = False, log_file: Optional[str] = None) -> DebugLogger:
+def initialize_debug_logger(enabled: bool = False, log_file: Optional[str] = None, report_name: Optional[str] = None) -> DebugLogger:
     """
     Initialize global debug logger.
 
     Args:
         enabled: Whether debug logging is enabled
         log_file: Optional custom log file path
+        report_name: Optional report name to use in auto-generated filename
 
     Returns:
         DebugLogger instance
@@ -129,7 +134,7 @@ def initialize_debug_logger(enabled: bool = False, log_file: Optional[str] = Non
     global _debug_logger
     if _debug_logger is not None:
         _debug_logger.close()
-    _debug_logger = DebugLogger(enabled=enabled, log_file=log_file)
+    _debug_logger = DebugLogger(enabled=enabled, log_file=log_file, report_name=report_name)
     return _debug_logger
 
 
